@@ -355,7 +355,7 @@ impl DnsHeader {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 enum QueryType {
     Unknown(u16),
     A,     // 1
@@ -700,10 +700,7 @@ impl DnsPacket {
     }
 }
 
-fn main() -> io::Result<()> {
-    let qname = "yahoo.com";
-    let qtype = QueryType::MX;
-
+fn lookup(qname: &str, qtype: QueryType) -> io::Result<DnsPacket> {
     let server = ("8.8.8.8", 53);
 
     let socket = UdpSocket::bind(("0.0.0.0", 0))?;
@@ -724,21 +721,68 @@ fn main() -> io::Result<()> {
     let mut res_buffer = BytePacketBuffer::new();
     socket.recv_from(&mut res_buffer.buf)?;
 
-    let res_packet = DnsPacket::from_buffer(&mut res_buffer).unwrap();
-    println!("{:#?}", res_packet.header);
+    Ok(DnsPacket::from_buffer(&mut res_buffer).unwrap())
+}
 
-    for q in res_packet.questions {
-        println!("{:#?}", q);
+fn handle_query(socket: &UdpSocket) -> io::Result<()> {
+    let mut req_buffer = BytePacketBuffer::new();
+
+    let (_, src) = socket.recv_from(&mut req_buffer.buf)?;
+
+    let mut request = DnsPacket::from_buffer(&mut req_buffer).unwrap();
+
+    let mut packet = DnsPacket::new();
+    packet.header.id = request.header.id;
+    packet.header.recursion_desired = true;
+    packet.header.recursion_available = true;
+    packet.header.response = true;
+
+    if let Some(question) = request.questions.pop() {
+        println!("Received query: {:?}", question);
+
+        if let Ok(result) = lookup(&question.name, question.qtype) {
+            packet.questions.push(question);
+            packet.header.rescode = result.header.rescode;
+
+            for rec in result.answers {
+                println!("Answer: {:?}", rec);
+                packet.answers.push(rec);
+            }
+            for rec in result.authorities {
+                println!("Authority: {:?}", rec);
+                packet.authorities.push(rec);
+            }
+            for rec in result.resources {
+                println!("Resource: {:?}", rec);
+                packet.resources.push(rec);
+            }
+        } else {
+            packet.header.rescode = ResultCode::ServFail;
+        }
+    } else {
+        packet.header.rescode = ResultCode::FormErr;
     }
-    for rec in res_packet.answers {
-        println!("{:#?}", rec);
-    }
-    for rec in res_packet.authorities {
-        println!("{:#?}", rec);
-    }
-    for rec in res_packet.resources {
-        println!("{:#?}", rec);
-    }
+
+    let mut res_buffer = BytePacketBuffer::new();
+    packet.write(&mut res_buffer).unwrap();
+
+    let len = res_buffer.pos();
+    let data = res_buffer.get_range(0, len).unwrap();
+
+    socket.send_to(data, src)?;
 
     Ok(())
+}
+
+fn main() -> io::Result<()> {
+    let socket = UdpSocket::bind(("0.0.0.0", 2053))?;
+
+    println!("Running DNS server on {}", socket.local_addr()?);
+
+    loop {
+        match handle_query(&socket) {
+            Ok(_) => {},
+            Err(e) => eprintln!("An error occurred: {}", e),
+        }
+    }
 }
