@@ -1,11 +1,44 @@
 use std::net::Ipv4Addr;
 
+use nom::combinator::map;
+use nom::bits::complete::take;
+use ux::u4;
+
 use self::{byte_packet_buffer::BytePacketBuffer, dns_header::DnsHeader, dns_question::DnsQuestion, dns_record::DnsRecord};
 
 pub mod byte_packet_buffer;
 pub mod dns_question;
 pub mod dns_record;
 mod dns_header;
+
+
+type Input<'a> = &'a[u8];
+type ParseResult<'a, T> = nom::IResult<Input<'a>, T, ()>;
+
+type BitInput<'a> = (&'a[u8], usize);
+type BitResult<'a, T> = nom::IResult<BitInput<'a>, T, ()>;
+
+
+trait BitParsable
+where
+    Self: Sized,
+{
+    fn parse(i: BitInput) -> BitResult<Self>;
+}
+
+impl BitParsable for u4 {
+    fn parse(i: BitInput) -> BitResult<Self> {
+        map(take(4_usize), Self::new)(i)
+    }
+}
+
+impl BitParsable for bool {
+    fn parse(i: BitInput) -> BitResult<Self> {
+        map(take(1_usize), |x: u8| { x != 0 })(i)
+    }
+}
+
+
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum ResultCode {
@@ -17,9 +50,9 @@ pub enum ResultCode {
     Refused = 5,
 }
 
-impl From<u8> for ResultCode {
-    fn from(value: u8) -> Self {
-        match value {
+impl From<u4> for ResultCode {
+    fn from(value: u4) -> Self {
+        match u8::from(value) {
             1 => ResultCode::FormErr,
             2 => ResultCode::ServFail,
             3 => ResultCode::NxDomain,
@@ -99,7 +132,9 @@ impl DnsPacket {
 
     pub fn from_buffer(buffer: &mut BytePacketBuffer) -> Result<Self, String> {
         let mut result = DnsPacket::new();
-        result.header.read(buffer)?;
+        let (_, h) = DnsHeader::parse(&buffer.buf).unwrap();
+        buffer.seek(12).unwrap();
+        result.header = h;
 
         for _ in 0..result.header.questions {
             let mut question = DnsQuestion::new("".to_string(), QueryType::Unknown(0));

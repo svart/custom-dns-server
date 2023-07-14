@@ -14,7 +14,7 @@ fn lookup(qname: &str, qtype: QueryType, server: (Ipv4Addr, u16)) -> io::Result<
     let mut packet = DnsPacket::new();
     packet.header.id = 6666;
     packet.header.questions = 1;
-    packet.header.recursion_desired = true;
+    packet.header.flags.recursion_desired = true;
     packet
         .questions
         .push(DnsQuestion { name: qname.to_string(), qtype});
@@ -41,11 +41,11 @@ fn recursive_lookup(qname: &str, qtype: QueryType) -> io::Result<DnsPacket> {
         let server = (ns_copy, 53);
         let response = lookup(qname, qtype, server)?;
 
-        if !response.answers.is_empty() && response.header.rescode == ResultCode::NoError {
+        if !response.answers.is_empty() && response.header.flags.rescode == ResultCode::NoError {
             return Ok(response);
         }
 
-        if response.header.rescode == ResultCode::NxDomain {
+        if response.header.flags.rescode == ResultCode::NxDomain {
             return Ok(response);
         }
 
@@ -78,16 +78,16 @@ fn handle_query(socket: &UdpSocket) -> io::Result<()> {
 
     let mut packet = DnsPacket::new();
     packet.header.id = request.header.id;
-    packet.header.recursion_desired = true;
-    packet.header.recursion_available = true;
-    packet.header.response = true;
+    packet.header.flags.recursion_desired = true;
+    packet.header.flags.recursion_available = true;
+    packet.header.flags.response = true;
 
     if let Some(question) = request.questions.pop() {
         println!("Received query: {:?}", question);
 
         if let Ok(result) = recursive_lookup(&question.name, question.qtype) {
             packet.questions.push(question);
-            packet.header.rescode = result.header.rescode;
+            packet.header.flags.rescode = result.header.flags.rescode;
 
             for rec in result.answers {
                 println!("Answer: {:?}", rec);
@@ -102,10 +102,10 @@ fn handle_query(socket: &UdpSocket) -> io::Result<()> {
                 packet.resources.push(rec);
             }
         } else {
-            packet.header.rescode = ResultCode::ServFail;
+            packet.header.flags.rescode = ResultCode::ServFail;
         }
     } else {
-        packet.header.rescode = ResultCode::FormErr;
+        packet.header.flags.rescode = ResultCode::FormErr;
     }
 
     let mut res_buffer = BytePacketBuffer::new();

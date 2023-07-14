@@ -30,7 +30,7 @@ impl BytePacketBuffer {
     }
 
     /// Change the buffer position
-    fn seek(&mut self, pos: usize) -> Result<(), String> {
+    pub fn seek(&mut self, pos: usize) -> Result<(), String> {
         if pos >= MAX_DNS_MSG_SIZE {
             return Err("End of buffer".into());
         }
