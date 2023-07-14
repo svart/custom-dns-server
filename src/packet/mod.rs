@@ -1,8 +1,10 @@
-use std::net::Ipv4Addr;
+use std::{net::Ipv4Addr, io};
 
 use nom::combinator::map;
 use nom::bits::complete::take;
 use ux::u4;
+use bitvec::{view::BitView, vec::BitVec, prelude::Msb0};
+use cookie_factory as cf;
 
 use self::{byte_packet_buffer::BytePacketBuffer, dns_header::DnsHeader, dns_question::DnsQuestion, dns_record::DnsRecord};
 
@@ -11,6 +13,7 @@ pub mod dns_question;
 pub mod dns_record;
 mod dns_header;
 
+// Parsing
 
 type Input<'a> = &'a[u8];
 type ParseResult<'a, T> = nom::IResult<Input<'a>, T, ()>;
@@ -38,7 +41,54 @@ impl BitParsable for bool {
     }
 }
 
+// Serialization
 
+type BitOutput = BitVec<u8, Msb0>;
+
+fn write_bits<W, F>(f: F) -> impl cf::SerializeFn<W>
+where
+    W: io::Write,
+    F: Fn(&mut BitOutput),
+{
+    move |mut out: cf::WriteContext<W>| {
+        let mut bo = BitOutput::new();
+        f(&mut bo);
+
+        io::Write::write(&mut out, bo.as_raw_slice())?;
+        Ok(out)
+    }
+}
+
+trait WriteLastNBits {
+    fn write_last_n_bits<B: BitView>(&mut self, b: B, num_bits: usize);
+}
+
+impl WriteLastNBits for BitOutput {
+    fn write_last_n_bits<B: BitView>(&mut self, b: B, num_bits: usize) {
+        let bitslice = b.view_bits::<Msb0>();
+        let start = bitslice.len() - num_bits;
+        self.extend_from_bitslice(&bitslice[start..])
+    }
+}
+
+trait BitSerialize {
+    fn write(&self, b: &mut BitOutput);
+}
+
+impl BitSerialize for u4 {
+    fn write(&self, b: &mut BitOutput) {
+        // use u8 here because bitvec implements its traits only for standard types
+        b.write_last_n_bits(u8::from(*self), 4)
+    }
+}
+
+impl BitSerialize for bool {
+    fn write(&self, b: &mut BitOutput) {
+        b.write_last_n_bits(u8::from(*self), 1)
+    }
+}
+
+// Structs
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum ResultCode {
@@ -59,6 +109,19 @@ impl From<u4> for ResultCode {
             4 => ResultCode::NoTimp,
             5 => ResultCode::Refused,
             0 | _ => ResultCode::NoError,
+        }
+    }
+}
+
+impl From<ResultCode> for u4 {
+    fn from(value: ResultCode) -> Self {
+        match value {
+            ResultCode::FormErr => u4::new(1),
+            ResultCode::ServFail => u4::new(2),
+            ResultCode::NxDomain => u4::new(3),
+            ResultCode::NoTimp => u4::new(4),
+            ResultCode::Refused => u4::new(5),
+            ResultCode::NoError => u4::new(0),
         }
     }
 }
@@ -166,7 +229,10 @@ impl DnsPacket {
         self.header.authoritative_entries = self.authorities.len() as u16;
         self.header.resource_entries = self.resources.len() as u16;
 
-        self.header.write(buffer)?;
+        let serialized_header = cf::gen_simple(self.header.serialize(), Vec::new()).map_err(|_|{ "cannot serialize header".to_owned() })?;
+        for i in 0..dns_header::DNS_HEADER_LEN {
+            buffer.write_u8(serialized_header[i])?;
+        }
 
         for question in &self.questions {
             question.write(buffer)?;

@@ -1,14 +1,18 @@
-use super::{Input, ParseResult};
-use super::{ResultCode, byte_packet_buffer::BytePacketBuffer};
+use std::io;
+
+use super::{Input, ParseResult, write_bits, BitSerialize};
+use super::ResultCode;
 use super::BitParsable;
 
 use nom::bits::bits;
 use nom::number::complete::be_u16;
-
 use nom::sequence::tuple;
+use cookie_factory as cf;
 use ux::u4;
 
-const DNS_HEADER_LEN: usize = 12;
+
+pub const DNS_HEADER_LEN: usize = 12;
+
 
 #[derive(Debug, PartialEq)]
 pub struct DnsHeaderFlags {
@@ -75,6 +79,21 @@ impl DnsHeaderFlags {
             }
         ))
     }
+
+    pub fn serialize<'a, W: io::Write + 'a>(&'a self) -> impl cf::SerializeFn<W> +'a {
+        write_bits(move |b| {
+            self.response.write(b);
+            self.opcode.write(b);
+            self.authoritative_answer.write(b);
+            self.truncated_message.write(b);
+            self.recursion_desired.write(b);
+            self.recursion_available.write(b);
+            self.z.write(b);
+            self.authed_data.write(b);
+            self.checking_disabled.write(b);
+            u4::from(self.rescode).write(b);
+        })
+    }
 }
 
 
@@ -121,31 +140,20 @@ impl DnsHeader {
         ))
     }
 
-    pub fn write(&self, buffer: &mut BytePacketBuffer) -> Result<(), String> {
-        buffer.write_u16(self.id)?;
+    pub fn serialize<'a, W: io::Write + 'a>(&'a self) -> impl cf::SerializeFn<W> +'a {
+        use cf::{
+            bytes::be_u16,
+            sequence::tuple
+        };
 
-        buffer.write_u8(
-            (self.flags.recursion_desired as u8)
-                | ((self.flags.truncated_message as u8) << 1)
-                | ((self.flags.authoritative_answer as u8) << 2)
-                | (u8::from(self.flags.opcode) << 3)
-                | ((self.flags.response as u8) << 7) as u8
-        )?;
-
-        buffer.write_u8(
-            (self.flags.rescode as u8)
-                | ((self.flags.checking_disabled as u8) << 4)
-                | ((self.flags.authed_data as u8) << 5)
-                | ((self.flags.z as u8) << 6)
-                | ((self.flags.recursion_available as u8) << 7)
-        )?;
-
-        buffer.write_u16(self.questions)?;
-        buffer.write_u16(self.answers)?;
-        buffer.write_u16(self.authoritative_entries)?;
-        buffer.write_u16(self.resource_entries)?;
-
-        Ok(())
+        tuple((
+            be_u16(self.id),
+            self.flags.serialize(),
+            be_u16(self.questions),
+            be_u16(self.answers),
+            be_u16(self.authoritative_entries),
+            be_u16(self.resource_entries),
+        ))
     }
 }
 
@@ -156,6 +164,7 @@ mod tests {
     use super::DnsHeader;
 
     use ux::u4;
+    use cookie_factory as cf;
 
     #[test]
     fn parse_bad_buffer() {
@@ -171,7 +180,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_one_query() {
+    fn check_one_query() {
         let data = [0x17, 0x34, 0x01, 0x20, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
         let (i, header) = DnsHeader::parse(&data).unwrap();
 
@@ -192,10 +201,13 @@ mod tests {
         assert_eq!(header.answers, 0);
         assert_eq!(header.authoritative_entries, 0);
         assert_eq!(header.resource_entries, 0);
+
+        let serialized = cf::gen_simple(header.serialize(), Vec::new()).unwrap();
+        assert_eq!(&data, serialized.as_slice());
     }
 
     #[test]
-    fn parse_one_response() {
+    fn check_one_response() {
         let data = [0x17, 0x34, 0x81, 0x80, 0x00, 0x01, 0x00, 0x06, 0x00, 0x00, 0x00, 0x00];
         let (i, header) = DnsHeader::parse(&data).unwrap();
 
@@ -216,5 +228,8 @@ mod tests {
         assert_eq!(header.answers, 6);
         assert_eq!(header.authoritative_entries, 0);
         assert_eq!(header.resource_entries, 0);
+
+        let serialized = cf::gen_simple(header.serialize(), Vec::new()).unwrap();
+        assert_eq!(&data, serialized.as_slice());
     }
 }
