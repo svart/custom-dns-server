@@ -1,18 +1,12 @@
 use std::io;
 
-use super::{Input, ParseResult, write_bits, BitSerialize};
-use super::ResultCode;
-use super::BitParsable;
+use super::{write_bits, BitParsable, BitSerialize, Input, ParseResult, ResultCode};
 
+use cookie_factory as cf;
 use nom::bits::bits;
 use nom::number::complete::be_u16;
 use nom::sequence::tuple;
-use cookie_factory as cf;
 use ux::u4;
-
-
-pub const DNS_HEADER_LEN: usize = 12;
-
 
 #[derive(Debug, PartialEq)]
 pub struct DnsHeaderFlags {
@@ -47,21 +41,34 @@ impl DnsHeaderFlags {
     }
 
     fn parse(i: Input) -> ParseResult<Self> {
-        // 1st byte of flags
         let (
             i,
-            (response, opcode, authoritative_answer, truncated_message, recursion_desired)
-        ) = bits(tuple(
-            (bool::parse, u4::parse, bool::parse, bool::parse, bool::parse)
-        ))(i)?;
-
-        // 2nd byte of flags
-        let (
-            i,
-            (recursion_available, z, authed_data, checking_disabled, rescode)
-        ) = bits(tuple(
-            (bool::parse, bool::parse, bool::parse, bool::parse, u4::parse)
-        ))(i)?;
+            (
+                response,
+                opcode,
+                authoritative_answer,
+                truncated_message,
+                recursion_desired,
+                recursion_available,
+                z,
+                authed_data,
+                checking_disabled,
+                rescode,
+            ),
+        ) = bits(tuple((
+            // 1st byte of flags
+            bool::parse,
+            u4::parse,
+            bool::parse,
+            bool::parse,
+            bool::parse,
+            // 2nd byte of flags
+            bool::parse,
+            bool::parse,
+            bool::parse,
+            bool::parse,
+            u4::parse,
+        )))(i)?;
 
         Ok((
             i,
@@ -76,11 +83,11 @@ impl DnsHeaderFlags {
                 authed_data,
                 z,
                 recursion_available,
-            }
+            },
         ))
     }
 
-    pub fn serialize<'a, W: io::Write + 'a>(&'a self) -> impl cf::SerializeFn<W> +'a {
+    pub fn serialize<'a, W: io::Write + 'a>(&'a self) -> impl cf::SerializeFn<W> + 'a {
         write_bits(move |b| {
             self.response.write(b);
             self.opcode.write(b);
@@ -96,11 +103,10 @@ impl DnsHeaderFlags {
     }
 }
 
-
 #[derive(Debug, PartialEq)]
 pub struct DnsHeader {
     pub id: u16,
-    pub flags: DnsHeaderFlags,      // 16 bits
+    pub flags: DnsHeaderFlags, // 16 bits
     pub questions: u16,
     pub answers: u16,
     pub authoritative_entries: u16,
@@ -120,12 +126,15 @@ impl DnsHeader {
     }
 
     pub fn parse(i: Input) -> ParseResult<Self> {
-        let (
-            i,
-            (id, flags, questions, answers, authoritative_entries, resource_entries)
-        ) = tuple(
-            (be_u16, DnsHeaderFlags::parse, be_u16, be_u16, be_u16, be_u16)
-        )(i)?;
+        let (i, (id, flags, questions, answers, authoritative_entries, resource_entries)) =
+            tuple((
+                be_u16,
+                DnsHeaderFlags::parse,
+                be_u16,
+                be_u16,
+                be_u16,
+                be_u16,
+            ))(i)?;
 
         Ok((
             i,
@@ -136,15 +145,12 @@ impl DnsHeader {
                 answers,
                 authoritative_entries,
                 resource_entries,
-            }
+            },
         ))
     }
 
-    pub fn serialize<'a, W: io::Write + 'a>(&'a self) -> impl cf::SerializeFn<W> +'a {
-        use cf::{
-            bytes::be_u16,
-            sequence::tuple
-        };
+    pub fn serialize<'a, W: io::Write + 'a>(&'a self) -> impl cf::SerializeFn<W> + 'a {
+        use cf::{bytes::be_u16, sequence::tuple};
 
         tuple((
             be_u16(self.id),
@@ -157,34 +163,38 @@ impl DnsHeader {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
-    use crate::packet::{ResultCode, dns_header::DNS_HEADER_LEN};
     use super::DnsHeader;
+    use crate::parse::{
+        byte_message_buffer::ByteMessageBuffer, dns_header::DNS_HEADER_LEN, ResultCode,
+    };
 
-    use ux::u4;
     use cookie_factory as cf;
+    use ux::u4;
 
     #[test]
     fn parse_bad_buffer() {
         let data = [0; 2 * DNS_HEADER_LEN];
 
         for i in 0..data.len() {
+            let mut buffer = ByteMessageBuffer::new(&data[..i]);
+
             if i < DNS_HEADER_LEN {
-                assert!(DnsHeader::parse(&data[..i]).is_err());
+                assert!(DnsHeader::parse(&mut buffer).is_err());
             } else {
-                assert!(DnsHeader::parse(&data[..i]).is_ok());
+                assert!(DnsHeader::parse(&mut buffer).is_ok());
             }
         }
     }
 
     #[test]
     fn check_one_query() {
-        let data = [0x17, 0x34, 0x01, 0x20, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
-        let (i, header) = DnsHeader::parse(&data).unwrap();
-
-        assert_eq!(i.len(), 0);
+        let data = [
+            0x17, 0x34, 0x01, 0x20, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ];
+        let mut buffer = ByteMessageBuffer::new(&data);
+        let header = DnsHeader::parse(&mut buffer).unwrap();
 
         assert_eq!(header.id, 0x1734);
         assert_eq!(header.flags.recursion_desired, true);
@@ -208,10 +218,11 @@ mod tests {
 
     #[test]
     fn check_one_response() {
-        let data = [0x17, 0x34, 0x81, 0x80, 0x00, 0x01, 0x00, 0x06, 0x00, 0x00, 0x00, 0x00];
-        let (i, header) = DnsHeader::parse(&data).unwrap();
-
-        assert_eq!(i.len(), 0);
+        let data = [
+            0x17, 0x34, 0x81, 0x80, 0x00, 0x01, 0x00, 0x06, 0x00, 0x00, 0x00, 0x00,
+        ];
+        let mut buffer = ByteMessageBuffer::new(&data);
+        let header = DnsHeader::parse(&mut buffer).unwrap();
 
         assert_eq!(header.id, 0x1734);
         assert_eq!(header.flags.recursion_desired, true);

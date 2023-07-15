@@ -1,41 +1,45 @@
-use std::net::{Ipv4Addr, UdpSocket};
 use std::io;
+use std::net::{Ipv4Addr, UdpSocket};
 
-use packet::byte_packet_buffer::BytePacketBuffer;
-use packet::dns_question::DnsQuestion;
-use packet::{DnsPacket, QueryType, ResultCode};
+mod parse;
 
-mod packet;
+use cookie_factory::gen_simple;
+use parse::byte_message_buffer::{MAX_DNS_MSG_SIZE, ByteMessageBuffer};
+use parse::dns_packet::DnsPacket;
+use parse::dns_question::DnsQuestion;
+use parse::dns_query_type::QueryType;
+use parse::dns_qname::Qname;
+use parse::ResultCode;
 
-
-fn lookup(qname: &str, qtype: QueryType, server: (Ipv4Addr, u16)) -> io::Result<DnsPacket> {
+fn lookup(qname: &Qname, qtype: QueryType, server: (Ipv4Addr, u16)) -> io::Result<DnsPacket> {
     let socket = UdpSocket::bind(("0.0.0.0", 0))?;
 
     let mut packet = DnsPacket::new();
     packet.header.id = 6666;
     packet.header.questions = 1;
     packet.header.flags.recursion_desired = true;
-    packet
-        .questions
-        .push(DnsQuestion { name: qname.to_string(), qtype});
+    packet.questions.push(DnsQuestion {
+        name: qname.clone(),
+        qtype,
+    });
 
-    let mut req_buffer = BytePacketBuffer::new();
-    packet.write(&mut req_buffer).unwrap();
+    let req_buffer = gen_simple(packet.serialize(), Vec::new()).unwrap();
 
-    socket.send_to(&req_buffer.buf[0..req_buffer.pos()], server)?;
+    socket.send_to(&req_buffer, server)?;
 
-    let mut res_buffer = BytePacketBuffer::new();
-    socket.recv_from(&mut res_buffer.buf)?;
+    let mut res_buffer = Vec::new();
+    socket.recv_from(&mut res_buffer)?;
 
-    Ok(DnsPacket::from_buffer(&mut res_buffer).unwrap())
+    let (_, packet) = DnsPacket::parse(&res_buffer, &ByteMessageBuffer::new(&res_buffer)).unwrap();
+    Ok(packet)
 }
 
-fn recursive_lookup(qname: &str, qtype: QueryType) -> io::Result<DnsPacket> {
+fn recursive_lookup(qname: &Qname, qtype: QueryType) -> io::Result<DnsPacket> {
     // For now we are always starting with `a.root-server.net`.
     let mut ns = "198.41.0.4".parse::<Ipv4Addr>().unwrap();
 
     loop {
-        println!("attempting lookup of {qtype:?} {qname} with ns {ns}");
+        println!("attempting lookup of {qtype:?} {qname:?} with ns {ns}");
 
         let ns_copy = ns;
         let server = (ns_copy, 53);
@@ -70,11 +74,13 @@ fn recursive_lookup(qname: &str, qtype: QueryType) -> io::Result<DnsPacket> {
 }
 
 fn handle_query(socket: &UdpSocket) -> io::Result<()> {
-    let mut req_buffer = BytePacketBuffer::new();
+    let mut msg_buf = [0u8; MAX_DNS_MSG_SIZE];
 
-    let (_, src) = socket.recv_from(&mut req_buffer.buf)?;
+    let (len, src) = socket.recv_from(&mut msg_buf)?;
 
-    let mut request = DnsPacket::from_buffer(&mut req_buffer).unwrap();
+    let byte_buffer = ByteMessageBuffer::new(&msg_buf[..len]);
+
+    let (_, mut request) = DnsPacket::parse(&msg_buf, &byte_buffer).unwrap();
 
     let mut packet = DnsPacket::new();
     packet.header.id = request.header.id;
@@ -108,13 +114,10 @@ fn handle_query(socket: &UdpSocket) -> io::Result<()> {
         packet.header.flags.rescode = ResultCode::FormErr;
     }
 
-    let mut res_buffer = BytePacketBuffer::new();
-    packet.write(&mut res_buffer).unwrap();
+    packet.update_header();
+    let res_buffer = gen_simple(packet.serialize(), Vec::new()).unwrap();
 
-    let len = res_buffer.pos();
-    let data = res_buffer.get_range(0, len).unwrap();
-
-    socket.send_to(data, src)?;
+    socket.send_to(&res_buffer, src)?;
 
     Ok(())
 }
@@ -126,8 +129,8 @@ fn main() -> io::Result<()> {
 
     loop {
         match handle_query(&socket) {
-            Ok(_) => {},
             Err(e) => eprintln!("An error occurred: {}", e),
+            Ok(_) => {}
         }
     }
 }
