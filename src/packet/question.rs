@@ -1,8 +1,10 @@
 use std::io;
 
 use super::{
-    byte_message_buffer::ByteMessageBuffer, dns_qname::Qname, dns_query_type::QueryType, Input,
-    ParseError, ParseResult,
+    byte_buffer::ByteBuffer,
+    parse::{Input, ParseError, ParseResult},
+    qname::Qname,
+    query_type::QueryType,
 };
 
 use cookie_factory as cf;
@@ -28,9 +30,8 @@ pub struct DnsQuestion {
 }
 
 impl DnsQuestion {
-    pub fn parse<'a>(i: Input<'a>, buf: &'a ByteMessageBuffer) -> ParseResult<'a, Self> {
-        let (i, (name, qtype, qclass)) =
-            tuple((buf.read_qname(), QueryType::parse, be_u16))(i)?;
+    pub fn parse<'a>(i: Input<'a>, buf: &'a ByteBuffer) -> ParseResult<'a, Self> {
+        let (i, (name, qtype, qclass)) = tuple((buf.read_qname(), QueryType::parse, be_u16))(i)?;
 
         if qclass != 1 {
             return Err(nom::Err::Failure(ParseError::DnsQuestion((

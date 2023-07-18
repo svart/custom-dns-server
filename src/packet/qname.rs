@@ -1,10 +1,9 @@
 use std::io;
 
 use cookie_factory as cf;
-
 use thiserror::Error;
 
-use super::ParseError;
+use super::parse::ParseError;
 
 pub const MAX_QNAME_LEN: usize = 255;
 pub const MAX_LABEL_LEN: usize = 63;

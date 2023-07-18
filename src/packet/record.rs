@@ -7,8 +7,10 @@ use nom::{
 };
 
 use super::{
-    byte_message_buffer::ByteMessageBuffer, dns_qname::Qname, dns_query_type::QueryType, Input,
-    ParseResult,
+    byte_buffer::ByteBuffer,
+    qname::Qname,
+    query_type::QueryType,
+    parse::{Input, ParseResult},
 };
 
 #[derive(Debug)]
@@ -48,7 +50,7 @@ pub enum DnsRecord {
 }
 
 impl DnsRecord {
-    pub fn parse<'a>(i: Input<'a>, buf: &'a ByteMessageBuffer) -> ParseResult<'a, Self> {
+    pub fn parse<'a>(i: Input<'a>, buf: &'a ByteBuffer) -> ParseResult<'a, Self> {
         let (i, (domain, qtype, _, ttl, data_len)) =
             tuple((buf.read_qname(), QueryType::parse, be_u16, be_u32, be_u16))(i)?;
 
@@ -146,7 +148,11 @@ impl DnsRecord {
                 be_u16(host.serialized_size()),
                 host.serialize(),
             ))),
-            DnsRecord::CNAME { ref domain, ref host, ttl } => Box::new(tuple((
+            DnsRecord::CNAME {
+                ref domain,
+                ref host,
+                ttl,
+            } => Box::new(tuple((
                 domain.serialize(),
                 QueryType::CNAME.serialize(),
                 be_u16(1),

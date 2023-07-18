@@ -1,20 +1,21 @@
 use std::io;
 use std::net::{Ipv4Addr, UdpSocket};
 
-mod parse;
-
 use cookie_factory::gen_simple;
-use parse::byte_message_buffer::{MAX_DNS_MSG_SIZE, ByteMessageBuffer};
-use parse::dns_packet::DnsPacket;
-use parse::dns_question::DnsQuestion;
-use parse::dns_query_type::QueryType;
-use parse::dns_qname::Qname;
-use parse::ResultCode;
 
-fn lookup(qname: &Qname, qtype: QueryType, server: (Ipv4Addr, u16)) -> io::Result<DnsPacket> {
+mod packet;
+
+use packet::byte_buffer::{MAX_DNS_MSG_SIZE, ByteBuffer};
+use packet::message::DnsMessage;
+use packet::question::DnsQuestion;
+use packet::query_type::QueryType;
+use packet::qname::Qname;
+use packet::ResultCode;
+
+fn lookup(qname: &Qname, qtype: QueryType, server: (Ipv4Addr, u16)) -> io::Result<DnsMessage> {
     let socket = UdpSocket::bind(("0.0.0.0", 0))?;
 
-    let mut packet = DnsPacket::new();
+    let mut packet = DnsMessage::new();
     packet.header.id = 6666;
     packet.header.questions = 1;
     packet.header.flags.recursion_desired = true;
@@ -31,11 +32,11 @@ fn lookup(qname: &Qname, qtype: QueryType, server: (Ipv4Addr, u16)) -> io::Resul
     let (len, _) = socket.recv_from(&mut res_buffer)?;
     let res_buffer = &res_buffer[..len];
 
-    let (_, packet) = DnsPacket::parse(&res_buffer, &ByteMessageBuffer::new(&res_buffer)).unwrap();
+    let (_, packet) = DnsMessage::parse(&res_buffer, &ByteBuffer::new(&res_buffer)).unwrap();
     Ok(packet)
 }
 
-fn recursive_lookup(qname: &Qname, qtype: QueryType) -> io::Result<DnsPacket> {
+fn recursive_lookup(qname: &Qname, qtype: QueryType) -> io::Result<DnsMessage> {
     // For now we are always starting with `a.root-server.net`.
     let mut ns = "198.41.0.4".parse::<Ipv4Addr>().unwrap();
 
@@ -80,11 +81,11 @@ fn handle_query(socket: &UdpSocket) -> io::Result<()> {
     let (len, src) = socket.recv_from(&mut msg_buf)?;
     let msg_buf = &msg_buf[..len];
 
-    let byte_buffer = ByteMessageBuffer::new(&msg_buf);
+    let byte_buffer = ByteBuffer::new(&msg_buf);
 
-    let (_, mut request) = DnsPacket::parse(&msg_buf, &byte_buffer).unwrap();
+    let (_, mut request) = DnsMessage::parse(&msg_buf, &byte_buffer).unwrap();
 
-    let mut packet = DnsPacket::new();
+    let mut packet = DnsMessage::new();
     packet.header.id = request.header.id;
     packet.header.flags.recursion_desired = true;
     packet.header.flags.recursion_available = true;

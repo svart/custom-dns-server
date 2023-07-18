@@ -1,4 +1,4 @@
-use super::{Input, ParseResult};
+use super::parse::{Input, ParseResult};
 
 #[derive(Debug, Clone, Copy)]
 pub enum QueryType {

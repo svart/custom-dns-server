@@ -1,6 +1,7 @@
 use std::io;
 
-use super::{write_bits, BitParsable, BitSerialize, Input, ParseResult, ResultCode};
+use super::parse::{write_bits, BitParsable, BitSerialize, Input, ParseResult};
+use super::ResultCode;
 
 use cookie_factory as cf;
 use nom::bits::bits;
@@ -166,7 +167,7 @@ impl DnsHeader {
 #[cfg(test)]
 mod tests {
     use super::DnsHeader;
-    use crate::parse::ResultCode;
+    use crate::packet::ResultCode;
 
     use cookie_factory as cf;
     use ux::u4;

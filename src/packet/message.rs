@@ -11,15 +11,16 @@ pub enum DnsPacketError {
 }
 
 use super::{
-    byte_message_buffer::{ByteBufferError, ByteMessageBuffer},
-    dns_header::DnsHeader,
-    dns_question::DnsQuestion,
-    dns_record::DnsRecord,
-    Input, ParseResult, dns_qname::Qname,
+    byte_buffer::{ByteBuffer, ByteBufferError},
+    header::DnsHeader,
+    parse::{Input, ParseResult},
+    qname::Qname,
+    question::DnsQuestion,
+    record::DnsRecord,
 };
 
 #[derive(Debug)]
-pub struct DnsPacket {
+pub struct DnsMessage {
     pub header: DnsHeader,
     pub questions: Vec<DnsQuestion>,
     pub answers: Vec<DnsRecord>,
@@ -27,7 +28,7 @@ pub struct DnsPacket {
     pub resources: Vec<DnsRecord>,
 }
 
-impl DnsPacket {
+impl DnsMessage {
     pub fn new() -> Self {
         Self {
             header: DnsHeader::new(),
@@ -45,7 +46,7 @@ impl DnsPacket {
         self.header.resource_entries = self.resources.len() as u16;
     }
 
-    pub fn parse<'a>(i: Input<'a>, buf: &'a ByteMessageBuffer) -> ParseResult<'a, Self> {
+    pub fn parse<'a>(i: Input<'a>, buf: &'a ByteBuffer) -> ParseResult<'a, Self> {
         let (i, header) = DnsHeader::parse(i)?;
         let (i, (questions, answers, authorities, resources)) = tuple((
             count(|x| DnsQuestion::parse(x, buf), header.questions as usize),
@@ -121,14 +122,13 @@ impl DnsPacket {
     }
 }
 
-
 #[cfg(test)]
 mod test {
     use std::path::Path;
 
-    use crate::parse::byte_message_buffer::ByteMessageBuffer;
+    use crate::packet::byte_buffer::ByteBuffer;
 
-    use super::DnsPacket;
+    use super::DnsMessage;
 
     fn get_data(path: &str) -> Vec<u8> {
         let path = Path::new(path);
@@ -139,9 +139,9 @@ mod test {
     #[test]
     fn parse_1() {
         let data = get_data("test_data/reply_1.bin");
-        let buffer = ByteMessageBuffer::new(&data);
+        let buffer = ByteBuffer::new(&data);
 
-        let (i, packet) = DnsPacket::parse(&data, &buffer).unwrap();
+        let (i, packet) = DnsMessage::parse(&data, &buffer).unwrap();
 
         assert_eq!(i.len(), 0);
 

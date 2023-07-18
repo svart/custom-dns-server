@@ -1,9 +1,9 @@
-use super::{
-    dns_qname::{Qname, QnameError},
-    Input, ParseError, ParseResult,
-};
-
 use thiserror::Error;
+
+use super::{
+    qname::{Qname, QnameError},
+    parse::{Input, ParseError, ParseResult},
+};
 
 pub const MAX_DNS_MSG_SIZE: usize = 512;
 const MAX_JUMPS: usize = 5;
@@ -25,11 +25,11 @@ impl<I> From<(I, ByteBufferError)> for ParseError<I> {
 }
 
 /// Immutable DNS message buffer to read packed qname with jumping around the buffer.
-pub struct ByteMessageBuffer<'a> {
+pub struct ByteBuffer<'a> {
     buf: &'a [u8],
 }
 
-impl<'a> ByteMessageBuffer<'a> {
+impl<'a> ByteBuffer<'a> {
     pub fn new(buf: &'a [u8]) -> Self {
         Self { buf }
     }
@@ -151,8 +151,8 @@ impl<'a> ByteMessageBuffer<'a> {
 mod test {
     use std::path::Path;
 
-    use super::ByteMessageBuffer;
-    use crate::parse::dns_qname::Qname;
+    use super::ByteBuffer;
+    use crate::packet::qname::Qname;
 
     const DNS_HEADER_LEN: usize = 12;
 
@@ -165,7 +165,7 @@ mod test {
     #[test]
     fn check_jumping_1() {
         let data = get_data("test_data/reply_1.bin");
-        let buffer = ByteMessageBuffer::new(&data);
+        let buffer = ByteBuffer::new(&data);
         let i = &data[DNS_HEADER_LEN..];
 
         // Queries
