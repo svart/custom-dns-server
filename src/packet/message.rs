@@ -124,11 +124,13 @@ impl DnsMessage {
                     })
             })
             .copied()
-            .next()
+            .choose(&mut rand::thread_rng())
     }
 
     pub fn get_unresolved_ns<'a>(&'a self, qname: &'a Qname) -> Option<&'a Qname> {
-        self.get_ns(qname).map(|(_, host)| host).next()
+        self.get_ns(qname)
+            .map(|(_, host)| host)
+            .choose(&mut rand::thread_rng())
     }
 }
 
