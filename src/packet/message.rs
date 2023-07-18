@@ -2,6 +2,7 @@ use std::net::Ipv4Addr;
 
 use cookie_factory as cf;
 use nom::{multi::count, sequence::tuple};
+use rand::seq::IteratorRandom;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -86,10 +87,19 @@ impl DnsMessage {
     }
 
     pub fn get_random_a(&self) -> Option<Ipv4Addr> {
-        self.answers.iter().find_map(|record| match record {
-            DnsRecord::A { addr, .. } => Some(*addr),
-            _ => None,
-        })
+        if let Some(DnsRecord::A { addr, .. }) = self
+            .answers
+            .iter()
+            .filter(|record| match record {
+                DnsRecord::A { .. } => true,
+                _ => false,
+            })
+            .choose(&mut rand::thread_rng())
+        {
+            Some(*addr)
+        } else {
+            None
+        }
     }
 
     fn get_ns<'a>(&'a self, qname: &'a Qname) -> impl Iterator<Item = (&'a Qname, &'a Qname)> {
