@@ -8,9 +8,9 @@ use nom::{
 
 use super::{
     byte_buffer::ByteBuffer,
+    parse::{Input, ParseResult},
     qname::Qname,
     query_type::QueryType,
-    parse::{Input, ParseResult},
 };
 
 #[derive(Debug)]
@@ -35,6 +35,17 @@ pub enum DnsRecord {
         domain: Qname,
         host: Qname,
         ttl: u32,
+    },
+    SOA {
+        domain: Qname,
+        ttl: u32,
+        primary_ns: Qname,
+        email: Qname,
+        serial: u32,
+        refresh: u32,
+        retry: u32,
+        expire: u32,
+        min_ttl: u32,
     },
     MX {
         domain: Qname,
@@ -74,6 +85,32 @@ impl DnsRecord {
             QueryType::CNAME => {
                 let (i, host) = buf.read_qname()(i)?;
                 Ok((i, DnsRecord::CNAME { domain, host, ttl }))
+            }
+            QueryType::SOA => {
+                let (i, (primary_ns, email, serial, refresh, retry, expire, min_ttl)) =
+                    tuple((
+                        buf.read_qname(),
+                        buf.read_qname(),
+                        be_u32,
+                        be_u32,
+                        be_u32,
+                        be_u32,
+                        be_u32,
+                    ))(i)?;
+                Ok((
+                    i,
+                    DnsRecord::SOA {
+                        domain,
+                        ttl,
+                        primary_ns,
+                        email,
+                        serial,
+                        refresh,
+                        retry,
+                        expire,
+                        min_ttl,
+                    },
+                ))
             }
             QueryType::MX => {
                 let (i, (priority, host)) = tuple((be_u16, buf.read_qname()))(i)?;
@@ -160,6 +197,30 @@ impl DnsRecord {
                 be_u16(host.serialized_size()),
                 host.serialize(),
             ))),
+            DnsRecord::SOA {
+                ref domain,
+                ttl,
+                ref primary_ns,
+                ref email,
+                serial,
+                refresh,
+                retry,
+                expire,
+                min_ttl,
+            } => Box::new(tuple((
+                domain.serialize(),
+                QueryType::SOA.serialize(),
+                be_u16(1),
+                be_u32(ttl),
+                be_u16(primary_ns.serialized_size() + email.serialized_size() + 5 * 4),
+                primary_ns.serialize(),
+                email.serialize(),
+                be_u32(serial),
+                be_u32(refresh),
+                be_u32(retry),
+                be_u32(expire),
+                be_u32(min_ttl),
+            ))),
             DnsRecord::MX {
                 ref domain,
                 priority,
@@ -175,9 +236,8 @@ impl DnsRecord {
                 host.serialize(),
             ))),
             DnsRecord::Unknown { .. } => {
-                // println!("Skipping record: {:?}", self);
-                // TODO: Think how to just skip this
-                unimplemented!("Unknown record processing is not implemented")
+                println!("Skipping record serialization: {:?}", self);
+                Box::new(|out| Ok(out))
             }
         }
     }

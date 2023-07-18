@@ -57,7 +57,7 @@ fn recursive_lookup(qname: &Qname, qtype: QueryType) -> io::Result<DnsMessage> {
     let mut ns = ROOT_SERVERS.choose(&mut rand::thread_rng()).unwrap().parse::<Ipv4Addr>().unwrap();
 
     loop {
-        println!("attempting lookup of {qtype:?} {qname:?} with ns {ns}");
+        println!("attempting to lookup {qtype:?} entry for {qname} on ns {ns}");
 
         let ns_copy = ns;
         let server = (ns_copy, 53);

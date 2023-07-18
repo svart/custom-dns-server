@@ -6,7 +6,7 @@ pub enum QueryType {
     A,     // a host address
     NS,    // an authoritative name server
     CNAME, // the canonical name for an alias
-    // SOA,   // marks the start of a zone of authority
+    SOA,   // marks the start of a zone of authority
     // WKS,   // a well known service description
     // PTR,   // a domain name pointer
     MX,   // mail exchange
@@ -19,7 +19,7 @@ impl From<u16> for QueryType {
             1 => QueryType::A,
             2 => QueryType::NS,
             5 => QueryType::CNAME,
-            // 6 => QueryType::SOA,
+            6 => QueryType::SOA,
             // 11 => QueryType::WKS,
             // 12 => QueryType::PTR,
             15 => QueryType::MX,
@@ -36,7 +36,7 @@ impl From<QueryType> for u16 {
             QueryType::A => 1,
             QueryType::NS => 2,
             QueryType::CNAME => 5,
-            // QueryType::SOA => 6,
+            QueryType::SOA => 6,
             // QueryType::WKS => 11,
             // QueryType::PTR => 12,
             QueryType::MX => 15,

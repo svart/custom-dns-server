@@ -71,6 +71,12 @@ impl TryFrom<Vec<String>> for Qname {
     }
 }
 
+impl std::fmt::Display for Qname {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Qname {{ {} }}", self.inner.join("."))
+    }
+}
+
 impl Qname {
     fn split_strings(value: &str) -> Result<Vec<String>, QnameError> {
         if value.len() > MAX_QNAME_LEN {
