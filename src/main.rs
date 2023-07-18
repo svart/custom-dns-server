@@ -27,8 +27,9 @@ fn lookup(qname: &Qname, qtype: QueryType, server: (Ipv4Addr, u16)) -> io::Resul
 
     socket.send_to(&req_buffer, server)?;
 
-    let mut res_buffer = Vec::new();
-    socket.recv_from(&mut res_buffer)?;
+    let mut res_buffer = [0u8; MAX_DNS_MSG_SIZE];
+    let (len, _) = socket.recv_from(&mut res_buffer)?;
+    let res_buffer = &res_buffer[..len];
 
     let (_, packet) = DnsPacket::parse(&res_buffer, &ByteMessageBuffer::new(&res_buffer)).unwrap();
     Ok(packet)
@@ -77,8 +78,9 @@ fn handle_query(socket: &UdpSocket) -> io::Result<()> {
     let mut msg_buf = [0u8; MAX_DNS_MSG_SIZE];
 
     let (len, src) = socket.recv_from(&mut msg_buf)?;
+    let msg_buf = &msg_buf[..len];
 
-    let byte_buffer = ByteMessageBuffer::new(&msg_buf[..len]);
+    let byte_buffer = ByteMessageBuffer::new(&msg_buf);
 
     let (_, mut request) = DnsPacket::parse(&msg_buf, &byte_buffer).unwrap();
 

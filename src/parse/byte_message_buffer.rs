@@ -101,7 +101,7 @@ impl<'a> ByteMessageBuffer<'a> {
 
                     // Update current reading position in
                     if jumps_performed == 0 {
-                        consumed += 1;
+                        consumed += 2;
                     }
 
                     // Take into account this jump.
@@ -152,7 +152,9 @@ mod test {
     use std::path::Path;
 
     use super::ByteMessageBuffer;
-    use crate::parse::{dns_header::DNS_HEADER_LEN, dns_qname::Qname};
+    use crate::parse::dns_qname::Qname;
+
+    const DNS_HEADER_LEN: usize = 12;
 
     fn get_data(path: &str) -> Vec<u8> {
         let path = Path::new(path);
@@ -163,213 +165,45 @@ mod test {
     #[test]
     fn check_jumping_1() {
         let data = get_data("test_data/reply_1.bin");
-        let mut buffer = ByteMessageBuffer::new(&data);
+        let buffer = ByteMessageBuffer::new(&data);
+        let i = &data[DNS_HEADER_LEN..];
 
-        assert!(buffer.seek(DNS_HEADER_LEN).is_ok());
         // Queries
-        assert_eq!(
-            buffer.read_qname(DNS_HEADER_LEN).unwrap(),
-            Qname::try_from("cns1.secureserver.net").unwrap()
-        );
-        assert!(buffer.seek(4).is_ok());
+        let (i, qname) = buffer.read_qname()(i).unwrap();
+
+        assert_eq!(qname, Qname::try_from("cns1.secureserver.net").unwrap());
+        let mut i = &i[4..];
 
         // Authoritative nameservers
-        // RR 1
-        assert_eq!(
-            buffer.read_qname().unwrap(),
-            Qname::try_from("net").unwrap()
-        );
-        assert!(buffer.seek(10).is_ok());
-        assert_eq!(
-            buffer.read_qname().unwrap(),
-            Qname::try_from("e.gtld-servers.net").unwrap()
-        );
-        // RR 2
-        assert_eq!(
-            buffer.read_qname().unwrap(),
-            Qname::try_from("net").unwrap()
-        );
-        assert!(buffer.seek(10).is_ok());
-        assert_eq!(
-            buffer.read_qname().unwrap(),
-            Qname::try_from("f.gtld-servers.net").unwrap()
-        );
-        // RR 3
-        assert_eq!(
-            buffer.read_qname().unwrap(),
-            Qname::try_from("net").unwrap()
-        );
-        assert!(buffer.seek(10).is_ok());
-        assert_eq!(
-            buffer.read_qname().unwrap(),
-            Qname::try_from("m.gtld-servers.net").unwrap()
-        );
-        // RR 4
-        assert_eq!(
-            buffer.read_qname().unwrap(),
-            Qname::try_from("net").unwrap()
-        );
-        assert!(buffer.seek(10).is_ok());
-        assert_eq!(
-            buffer.read_qname().unwrap(),
-            Qname::try_from("i.gtld-servers.net").unwrap()
-        );
-        // RR 5
-        assert_eq!(
-            buffer.read_qname().unwrap(),
-            Qname::try_from("net").unwrap()
-        );
-        assert!(buffer.seek(10).is_ok());
-        assert_eq!(
-            buffer.read_qname().unwrap(),
-            Qname::try_from("j.gtld-servers.net").unwrap()
-        );
-        // RR 6
-        assert_eq!(
-            buffer.read_qname().unwrap(),
-            Qname::try_from("net").unwrap()
-        );
-        assert!(buffer.seek(10).is_ok());
-        assert_eq!(
-            buffer.read_qname().unwrap(),
-            Qname::try_from("b.gtld-servers.net").unwrap()
-        );
-        // RR 7
-        assert_eq!(
-            buffer.read_qname().unwrap(),
-            Qname::try_from("net").unwrap()
-        );
-        assert!(buffer.seek(10).is_ok());
-        assert_eq!(
-            buffer.read_qname().unwrap(),
-            Qname::try_from("a.gtld-servers.net").unwrap()
-        );
-        // RR 8
-        assert_eq!(
-            buffer.read_qname().unwrap(),
-            Qname::try_from("net").unwrap()
-        );
-        assert!(buffer.seek(10).is_ok());
-        assert_eq!(
-            buffer.read_qname().unwrap(),
-            Qname::try_from("c.gtld-servers.net").unwrap()
-        );
-        // RR 9
-        assert_eq!(
-            buffer.read_qname().unwrap(),
-            Qname::try_from("net").unwrap()
-        );
-        assert!(buffer.seek(10).is_ok());
-        assert_eq!(
-            buffer.read_qname().unwrap(),
-            Qname::try_from("k.gtld-servers.net").unwrap()
-        );
-        // RR 10
-        assert_eq!(
-            buffer.read_qname().unwrap(),
-            Qname::try_from("net").unwrap()
-        );
-        assert!(buffer.seek(10).is_ok());
-        assert_eq!(
-            buffer.read_qname().unwrap(),
-            Qname::try_from("h.gtld-servers.net").unwrap()
-        );
-        // RR 11
-        assert_eq!(
-            buffer.read_qname().unwrap(),
-            Qname::try_from("net").unwrap()
-        );
-        assert!(buffer.seek(10).is_ok());
-        assert_eq!(
-            buffer.read_qname().unwrap(),
-            Qname::try_from("l.gtld-servers.net").unwrap()
-        );
-        // RR 12
-        assert_eq!(
-            buffer.read_qname().unwrap(),
-            Qname::try_from("net").unwrap()
-        );
-        assert!(buffer.seek(10).is_ok());
-        assert_eq!(
-            buffer.read_qname().unwrap(),
-            Qname::try_from("g.gtld-servers.net").unwrap()
-        );
-        // RR 13
-        assert_eq!(
-            buffer.read_qname().unwrap(),
-            Qname::try_from("net").unwrap()
-        );
-        assert!(buffer.seek(10).is_ok());
-        assert_eq!(
-            buffer.read_qname().unwrap(),
-            Qname::try_from("d.gtld-servers.net").unwrap()
-        );
+        for letter in ['e', 'f', 'm', 'i', 'j', 'b', 'a', 'c', 'k', 'h', 'l', 'g', 'd'] {
+            let (i_in, qname) = buffer.read_qname()(i).unwrap();
+            assert_eq!(qname, Qname::try_from("net").unwrap());
 
+            let i_in = &i_in[10..];
+
+            let server_name = letter.to_string() + ".gtld-servers.net";
+            let (i_in, qname) = buffer.read_qname()(i_in).unwrap();
+            assert_eq!(qname, Qname::try_from(server_name).unwrap());
+
+            i = i_in;
+        };
         // Additional records
-        // RR 1
-        assert_eq!(
-            buffer.read_qname().unwrap(),
-            Qname::try_from("e.gtld-servers.net").unwrap()
-        );
-        assert!(buffer.seek(14).is_ok());
-        // RR 2
-        assert_eq!(
-            buffer.read_qname().unwrap(),
-            Qname::try_from("e.gtld-servers.net").unwrap()
-        );
-        assert!(buffer.seek(26).is_ok());
-        // RR 3
-        assert_eq!(
-            buffer.read_qname().unwrap(),
-            Qname::try_from("f.gtld-servers.net").unwrap()
-        );
-        assert!(buffer.seek(14).is_ok());
-        // RR 4
-        assert_eq!(
-            buffer.read_qname().unwrap(),
-            Qname::try_from("f.gtld-servers.net").unwrap()
-        );
-        assert!(buffer.seek(26).is_ok());
-        // RR 5
-        assert_eq!(
-            buffer.read_qname().unwrap(),
-            Qname::try_from("m.gtld-servers.net").unwrap()
-        );
-        assert!(buffer.seek(14).is_ok());
-        // RR 6
-        assert_eq!(
-            buffer.read_qname().unwrap(),
-            Qname::try_from("m.gtld-servers.net").unwrap()
-        );
-        assert!(buffer.seek(26).is_ok());
-        // RR 7
-        assert_eq!(
-            buffer.read_qname().unwrap(),
-            Qname::try_from("i.gtld-servers.net").unwrap()
-        );
-        assert!(buffer.seek(14).is_ok());
-        // RR 8
-        assert_eq!(
-            buffer.read_qname().unwrap(),
-            Qname::try_from("i.gtld-servers.net").unwrap()
-        );
-        assert!(buffer.seek(26).is_ok());
-        // RR 9
-        assert_eq!(
-            buffer.read_qname().unwrap(),
-            Qname::try_from("j.gtld-servers.net").unwrap()
-        );
-        assert!(buffer.seek(14).is_ok());
-        // RR 10
-        assert_eq!(
-            buffer.read_qname().unwrap(),
-            Qname::try_from("j.gtld-servers.net").unwrap()
-        );
-        assert!(buffer.seek(26).is_ok());
-        // RR 11
-        assert_eq!(
-            buffer.read_qname().unwrap(),
-            Qname::try_from("b.gtld-servers.net").unwrap()
-        );
+        for letter in ['e', 'f', 'm', 'i', 'j'] {
+            let server_name = letter.to_string() + ".gtld-servers.net";
+
+            // IPv4
+            let (i_in, qname) = buffer.read_qname()(i).unwrap();
+            assert_eq!(qname, Qname::try_from(server_name.as_str()).unwrap());
+            let i_in = &i_in[14..];
+
+            // Ipv6
+            let (i_in, qname) = buffer.read_qname()(i_in).unwrap();
+            assert_eq!(qname, Qname::try_from(server_name.as_str()).unwrap());
+            let i_in = &i_in[26..];
+            i = i_in;
+        }
+        // the last one without pair
+        let (_, qname) = buffer.read_qname()(i).unwrap();
+        assert_eq!(qname, Qname::try_from("b.gtld-servers.net").unwrap());
     }
 }

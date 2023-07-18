@@ -166,24 +166,25 @@ impl DnsHeader {
 #[cfg(test)]
 mod tests {
     use super::DnsHeader;
-    use crate::parse::{
-        byte_message_buffer::ByteMessageBuffer, dns_header::DNS_HEADER_LEN, ResultCode,
-    };
+    use crate::parse::ResultCode;
 
     use cookie_factory as cf;
     use ux::u4;
 
+    const DNS_HEADER_LEN: usize = 12;
+
     #[test]
-    fn parse_bad_buffer() {
+    fn parse_buffer_variate_len() {
         let data = [0; 2 * DNS_HEADER_LEN];
 
-        for i in 0..data.len() {
-            let mut buffer = ByteMessageBuffer::new(&data[..i]);
+        for len in 0..data.len() {
+            let i = &data[..len];
 
-            if i < DNS_HEADER_LEN {
-                assert!(DnsHeader::parse(&mut buffer).is_err());
+            if len < DNS_HEADER_LEN {
+                assert!(DnsHeader::parse(i).is_err());
             } else {
-                assert!(DnsHeader::parse(&mut buffer).is_ok());
+                let (i, _) = DnsHeader::parse(i).unwrap();
+                assert_eq!(i.len(), len - DNS_HEADER_LEN);
             }
         }
     }
@@ -193,8 +194,9 @@ mod tests {
         let data = [
             0x17, 0x34, 0x01, 0x20, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         ];
-        let mut buffer = ByteMessageBuffer::new(&data);
-        let header = DnsHeader::parse(&mut buffer).unwrap();
+
+        let (i, header) = DnsHeader::parse(&data).unwrap();
+        assert_eq!(i.len(), 0);
 
         assert_eq!(header.id, 0x1734);
         assert_eq!(header.flags.recursion_desired, true);
@@ -221,8 +223,9 @@ mod tests {
         let data = [
             0x17, 0x34, 0x81, 0x80, 0x00, 0x01, 0x00, 0x06, 0x00, 0x00, 0x00, 0x00,
         ];
-        let mut buffer = ByteMessageBuffer::new(&data);
-        let header = DnsHeader::parse(&mut buffer).unwrap();
+
+        let (i, header) = DnsHeader::parse(&data).unwrap();
+        assert_eq!(i.len(), 0);
 
         assert_eq!(header.id, 0x1734);
         assert_eq!(header.flags.recursion_desired, true);

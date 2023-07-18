@@ -119,7 +119,7 @@ impl DnsRecord {
                 QueryType::A.serialize(),
                 be_u16(1),
                 be_u32(ttl),
-                be_u16(16),
+                be_u16(4),
                 slice(addr.octets()),
             ))),
             DnsRecord::AAAA {
@@ -170,7 +170,8 @@ impl DnsRecord {
             ))),
             DnsRecord::Unknown { .. } => {
                 // println!("Skipping record: {:?}", self);
-                todo!()
+                // TODO: Think how to just skip this
+                unimplemented!("Unknown record processing is not implemented")
             }
         }
     }

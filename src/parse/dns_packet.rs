@@ -120,3 +120,31 @@ impl DnsPacket {
         self.get_ns(qname).map(|(_, host)| host).next()
     }
 }
+
+
+#[cfg(test)]
+mod test {
+    use std::path::Path;
+
+    use crate::parse::byte_message_buffer::ByteMessageBuffer;
+
+    use super::DnsPacket;
+
+    fn get_data(path: &str) -> Vec<u8> {
+        let path = Path::new(path);
+        let data = std::fs::read(path).expect("cannot read file");
+        data
+    }
+
+    #[test]
+    fn parse_1() {
+        let data = get_data("test_data/reply_1.bin");
+        let buffer = ByteMessageBuffer::new(&data);
+
+        let (i, packet) = DnsPacket::parse(&data, &buffer).unwrap();
+
+        assert_eq!(i.len(), 0);
+
+        assert_eq!(packet.header.answers as usize, packet.answers.len());
+    }
+}

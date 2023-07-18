@@ -28,6 +28,16 @@ pub struct Qname {
     inner: Vec<String>,
 }
 
+impl TryFrom<String> for Qname {
+    type Error = QnameError;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Ok(Self {
+            inner: Qname::split_strings(value.as_str())?,
+        })
+    }
+}
+
 impl TryFrom<&str> for Qname {
     type Error = QnameError;
 
@@ -101,9 +111,6 @@ impl Qname {
     }
 
     pub fn ends_with(&self, other: &Qname) -> bool {
-        std::iter::zip(
-            self.inner.iter().rev(),
-            other.inner.iter().rev()
-        ).all(|(x, y)| x == y)
+        std::iter::zip(self.inner.iter().rev(), other.inner.iter().rev()).all(|(x, y)| x == y)
     }
 }
