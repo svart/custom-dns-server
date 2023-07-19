@@ -32,7 +32,7 @@ fn lookup(qname: &Qname, qtype: QueryType, server: (Ipv4Addr, u16)) -> io::Resul
     let (len, _) = socket.recv_from(&mut res_buffer)?;
     let res_buffer = &res_buffer[..len];
 
-    let (_, packet) = DnsMessage::parse(&res_buffer, &ByteBuffer::new(&res_buffer)).unwrap();
+    let (_, packet) = DnsMessage::parse(res_buffer, &ByteBuffer::new(res_buffer)).unwrap();
     Ok(packet)
 }
 
@@ -81,7 +81,7 @@ fn recursive_lookup(qname: &Qname, qtype: QueryType) -> io::Result<DnsMessage> {
             None => return Ok(response),
         };
 
-        let recursive_response = recursive_lookup(&new_ns_name, QueryType::A)?;
+        let recursive_response = recursive_lookup(new_ns_name, QueryType::A)?;
 
         if let Some(new_ns) = recursive_response.get_random_a() {
             ns = new_ns;
@@ -97,9 +97,9 @@ fn handle_query(socket: &UdpSocket) -> io::Result<()> {
     let (len, src) = socket.recv_from(&mut msg_buf)?;
     let msg_buf = &msg_buf[..len];
 
-    let byte_buffer = ByteBuffer::new(&msg_buf);
+    let byte_buffer = ByteBuffer::new(msg_buf);
 
-    let (_, mut request) = DnsMessage::parse(&msg_buf, &byte_buffer).unwrap();
+    let (_, mut request) = DnsMessage::parse(msg_buf, &byte_buffer).unwrap();
 
     let mut packet = DnsMessage::new();
     packet.header.id = request.header.id;
@@ -147,9 +147,8 @@ fn main() -> io::Result<()> {
     println!("Running DNS server on {}", socket.local_addr()?);
 
     loop {
-        match handle_query(&socket) {
-            Err(e) => eprintln!("An error occurred: {}", e),
-            Ok(_) => {}
+        if let Err(e) = handle_query(&socket) {
+            eprintln!("An error occurred: {}", e)
         }
     }
 }

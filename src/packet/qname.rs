@@ -55,7 +55,7 @@ impl TryFrom<Vec<String>> for Qname {
             .into_iter()
             .map(|x| {
                 if x.len() < MAX_LABEL_LEN {
-                    Ok(x.into())
+                    Ok(x)
                 } else {
                     Err(QnameError::BadLabelLen(x.len()))
                 }

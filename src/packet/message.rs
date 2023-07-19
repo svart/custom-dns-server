@@ -90,10 +90,7 @@ impl DnsMessage {
         if let Some(DnsRecord::A { addr, .. }) = self
             .answers
             .iter()
-            .filter(|record| match record {
-                DnsRecord::A { .. } => true,
-                _ => false,
-            })
+            .filter(|record| matches!(record, DnsRecord::A { .. }))
             .choose(&mut rand::thread_rng())
         {
             Some(*addr)
@@ -106,7 +103,7 @@ impl DnsMessage {
         self.authorities
             .iter()
             .filter_map(|record| match record {
-                DnsRecord::NS { domain, host, .. } => Some((domain, host)),
+                DnsRecord::Ns { domain, host, .. } => Some((domain, host)),
                 _ => None,
             })
             // Discard server which aren't authoritative to our query
@@ -144,8 +141,7 @@ mod test {
 
     fn get_data(path: &str) -> Vec<u8> {
         let path = Path::new(path);
-        let data = std::fs::read(path).expect("cannot read file");
-        data
+        std::fs::read(path).expect("cannot read file")
     }
 
     #[test]

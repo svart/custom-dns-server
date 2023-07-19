@@ -27,7 +27,8 @@ impl From<u4> for ResultCode {
             3 => ResultCode::NxDomain,
             4 => ResultCode::NoTimp,
             5 => ResultCode::Refused,
-            0 | _ => ResultCode::NoError,
+            0 => ResultCode::NoError,
+            _ => ResultCode::NoError,
         }
     }
 }

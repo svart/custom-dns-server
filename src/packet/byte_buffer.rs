@@ -158,8 +158,7 @@ mod test {
 
     fn get_data(path: &str) -> Vec<u8> {
         let path = Path::new(path);
-        let data = std::fs::read(path).expect("cannot read file");
-        data
+        std::fs::read(path).expect("cannot read file")
     }
 
     #[test]
