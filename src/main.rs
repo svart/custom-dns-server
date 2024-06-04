@@ -1,7 +1,6 @@
 use std::io;
 use std::net::{Ipv4Addr, SocketAddr};
 
-use async_recursion::async_recursion;
 use cookie_factory::gen_simple;
 use tokio::net::UdpSocket;
 
@@ -58,7 +57,6 @@ const ROOT_SERVERS: [&str; 13] = [
     "202.12.27.33",
 ];
 
-#[async_recursion]
 async fn recursive_lookup(qname: &Qname, qtype: QueryType) -> io::Result<DnsMessage> {
     use rand::seq::SliceRandom;
     let mut ns = ROOT_SERVERS
@@ -92,7 +90,7 @@ async fn recursive_lookup(qname: &Qname, qtype: QueryType) -> io::Result<DnsMess
             None => return Ok(response),
         };
 
-        let recursive_response = recursive_lookup(new_ns_name, QueryType::A).await?;
+        let recursive_response = Box::pin(recursive_lookup(new_ns_name, QueryType::A)).await?;
 
         if let Some(new_ns) = recursive_response.get_random_a() {
             ns = new_ns;
