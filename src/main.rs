@@ -1,5 +1,6 @@
 use std::io;
 use std::net::{Ipv4Addr, SocketAddr};
+use std::sync::Arc;
 
 use cookie_factory::gen_simple;
 use tokio::net::UdpSocket;
@@ -148,6 +149,7 @@ async fn handle_query(msg_buf: [u8; MAX_DNS_MSG_SIZE], len: usize) -> io::Result
 async fn main() -> io::Result<()> {
     let local_address = SocketAddr::new("0.0.0.0".parse().unwrap(), 2053);
     let socket = UdpSocket::bind(("0.0.0.0", 2053)).await?;
+    let socket = Arc::new(socket);
 
     println!("Starting DNS server on {local_address}");
 
@@ -156,10 +158,19 @@ async fn main() -> io::Result<()> {
 
         let (len, src) = socket.recv_from(&mut msg_buf).await?;
 
-        let worker = tokio::spawn(handle_query(msg_buf, len));
+        let socket = socket.clone();
 
-        let (result,) = tokio::join!(worker);
-
-        socket.send_to(&result.expect("failed to join").expect("fail during request handling"), src).await?;
+        tokio::spawn(async move {
+            match handle_query(msg_buf, len).await {
+                Ok(result) => {
+                    if let Err(err) = socket.send_to(&result, src).await {
+                        println!("failed to send result to {src}: {err}");
+                    }
+                },
+                Err(err) => {
+                    println!("error during handling request: {err}");
+                },
+            }
+        });
     }
 }
