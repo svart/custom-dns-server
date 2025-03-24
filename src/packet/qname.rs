@@ -10,7 +10,7 @@ pub const MAX_LABEL_LEN: usize = 63;
 
 #[derive(Debug, Error)]
 pub enum QnameError {
-    #[error("bogus qname label length: {0}, expected < {}", MAX_LABEL_LEN)]
+    #[error("bogus qname label length: {0}, expected < {max_len}", max_len=MAX_LABEL_LEN)]
     BadLabelLen(usize),
     #[error("exceeded maximum qname length, expected < {}", MAX_QNAME_LEN)]
     BadTotalLen,
@@ -108,10 +108,10 @@ impl Qname {
 
     // TODO: eliminate usage of this method by using cookie_factory methods
     pub fn serialized_size(&self) -> u16 {
-        use cf::gen;
+        use cf::r#gen as gen_f;
 
         let mut buf = [0u8; MAX_QNAME_LEN];
-        let (_, pos) = gen(self.serialize(), &mut buf[..]).unwrap();
+        let (_, pos) = gen_f(self.serialize(), &mut buf[..]).unwrap();
         pos as u16
     }
 

@@ -1,9 +1,9 @@
 use std::net::{Ipv4Addr, Ipv6Addr};
 
 use nom::{
+    Parser,
     bytes::complete::take,
     number::complete::{be_u16, be_u32},
-    sequence::tuple,
 };
 
 use super::{
@@ -63,7 +63,7 @@ pub enum DnsRecord {
 impl DnsRecord {
     pub fn parse<'a>(i: Input<'a>, buf: &'a ByteBuffer) -> ParseResult<'a, Self> {
         let (i, (domain, qtype, _, ttl, data_len)) =
-            tuple((buf.read_qname(), QueryType::parse, be_u16, be_u32, be_u16))(i)?;
+            (buf.read_qname(), QueryType::parse, be_u16, be_u32, be_u16).parse(i)?;
 
         match qtype {
             QueryType::A => {
@@ -87,16 +87,16 @@ impl DnsRecord {
                 Ok((i, DnsRecord::Cname { domain, host, ttl }))
             }
             QueryType::Soa => {
-                let (i, (primary_ns, email, serial, refresh, retry, expire, min_ttl)) =
-                    tuple((
-                        buf.read_qname(),
-                        buf.read_qname(),
-                        be_u32,
-                        be_u32,
-                        be_u32,
-                        be_u32,
-                        be_u32,
-                    ))(i)?;
+                let (i, (primary_ns, email, serial, refresh, retry, expire, min_ttl)) = (
+                    buf.read_qname(),
+                    buf.read_qname(),
+                    be_u32,
+                    be_u32,
+                    be_u32,
+                    be_u32,
+                    be_u32,
+                )
+                    .parse(i)?;
                 Ok((
                     i,
                     DnsRecord::Soa {
@@ -113,7 +113,7 @@ impl DnsRecord {
                 ))
             }
             QueryType::Mx => {
-                let (i, (priority, host)) = tuple((be_u16, buf.read_qname()))(i)?;
+                let (i, (priority, host)) = (be_u16, buf.read_qname()).parse(i)?;
                 Ok((
                     i,
                     DnsRecord::Mx {

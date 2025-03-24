@@ -1,12 +1,12 @@
 use std::io;
 
-use super::parse::{write_bits, BitParsable, BitSerialize, Input, ParseResult};
 use super::ResultCode;
+use super::parse::{BitParsable, BitSerialize, Input, ParseResult, write_bits};
 
 use cookie_factory as cf;
+use nom::Parser;
 use nom::bits::bits;
 use nom::number::complete::be_u16;
-use nom::sequence::tuple;
 use ux::u4;
 
 #[derive(Debug, PartialEq)]
@@ -56,7 +56,7 @@ impl DnsHeaderFlags {
                 checking_disabled,
                 rescode,
             ),
-        ) = bits(tuple((
+        ) = bits((
             // 1st byte of flags
             bool::parse,
             u4::parse,
@@ -69,7 +69,8 @@ impl DnsHeaderFlags {
             bool::parse,
             bool::parse,
             u4::parse,
-        )))(i)?;
+        ))
+        .parse(i)?;
 
         Ok((
             i,
@@ -127,15 +128,15 @@ impl DnsHeader {
     }
 
     pub fn parse(i: Input) -> ParseResult<Self> {
-        let (i, (id, flags, questions, answers, authoritative_entries, resource_entries)) =
-            tuple((
-                be_u16,
-                DnsHeaderFlags::parse,
-                be_u16,
-                be_u16,
-                be_u16,
-                be_u16,
-            ))(i)?;
+        let (i, (id, flags, questions, answers, authoritative_entries, resource_entries)) = (
+            be_u16,
+            DnsHeaderFlags::parse,
+            be_u16,
+            be_u16,
+            be_u16,
+            be_u16,
+        )
+            .parse(i)?;
 
         Ok((
             i,

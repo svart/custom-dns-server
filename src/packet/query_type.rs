@@ -51,7 +51,9 @@ impl QueryType {
         Ok((i, Self::from(qtype)))
     }
 
-    pub fn serialize<'a, W: std::io::Write + 'a>(&'a self) -> impl cookie_factory::SerializeFn<W> + 'a {
+    pub fn serialize<'a, W: std::io::Write + 'a>(
+        &'a self,
+    ) -> impl cookie_factory::SerializeFn<W> + 'a {
         cookie_factory::bytes::be_u16((*self).into())
     }
 }

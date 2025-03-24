@@ -1,8 +1,8 @@
 use thiserror::Error;
 
 use super::{
-    qname::{Qname, QnameError},
     parse::{Input, ParseError, ParseResult},
+    qname::{Qname, QnameError},
 };
 
 pub const MAX_DNS_MSG_SIZE: usize = 512;
@@ -174,7 +174,9 @@ mod test {
         let mut i = &i[4..];
 
         // Authoritative nameservers
-        for letter in ['e', 'f', 'm', 'i', 'j', 'b', 'a', 'c', 'k', 'h', 'l', 'g', 'd'] {
+        for letter in [
+            'e', 'f', 'm', 'i', 'j', 'b', 'a', 'c', 'k', 'h', 'l', 'g', 'd',
+        ] {
             let (i_in, qname) = buffer.read_qname()(i).unwrap();
             assert_eq!(qname, Qname::try_from("net").unwrap());
 
@@ -185,7 +187,7 @@ mod test {
             assert_eq!(qname, Qname::try_from(server_name).unwrap());
 
             i = i_in;
-        };
+        }
         // Additional records
         for letter in ['e', 'f', 'm', 'i', 'j'] {
             let server_name = letter.to_string() + ".gtld-servers.net";

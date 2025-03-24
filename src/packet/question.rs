@@ -8,7 +8,7 @@ use super::{
 };
 
 use cookie_factory as cf;
-use nom::{number::complete::be_u16, sequence::tuple};
+use nom::{Parser, number::complete::be_u16};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -31,7 +31,7 @@ pub struct DnsQuestion {
 
 impl DnsQuestion {
     pub fn parse<'a>(i: Input<'a>, buf: &'a ByteBuffer) -> ParseResult<'a, Self> {
-        let (i, (name, qtype, qclass)) = tuple((buf.read_qname(), QueryType::parse, be_u16))(i)?;
+        let (i, (name, qtype, qclass)) = (buf.read_qname(), QueryType::parse, be_u16).parse(i)?;
 
         if qclass != 1 {
             return Err(nom::Err::Failure(ParseError::DnsQuestion((

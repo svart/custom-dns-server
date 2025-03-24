@@ -7,12 +7,12 @@ use tokio::net::UdpSocket;
 
 mod packet;
 
+use packet::ResultCode;
 use packet::byte_buffer::{ByteBuffer, MAX_DNS_MSG_SIZE};
 use packet::message::DnsMessage;
 use packet::qname::Qname;
 use packet::query_type::QueryType;
 use packet::question::DnsQuestion;
-use packet::ResultCode;
 
 async fn lookup(
     qname: &Qname,
@@ -43,25 +43,25 @@ async fn lookup(
 }
 
 const ROOT_SERVERS: [&str; 13] = [
-    "198.41.0.4",
-    "199.9.14.201",
-    "192.33.4.12",
-    "199.7.91.13",
-    "192.203.230.10",
-    "192.5.5.241",
     "192.112.36.4",
-    "198.97.190.53",
+    "192.203.230.10",
+    "192.33.4.12",
     "192.36.148.17",
+    "192.5.5.241",
     "192.58.128.30",
     "193.0.14.129",
+    "198.41.0.4",
+    "198.97.190.53",
     "199.7.83.42",
+    "199.7.91.13",
+    "199.9.14.201",
     "202.12.27.33",
 ];
 
 async fn recursive_lookup(qname: &Qname, qtype: QueryType) -> io::Result<DnsMessage> {
-    use rand::seq::SliceRandom;
+    use rand::prelude::IndexedRandom;
     let mut ns = ROOT_SERVERS
-        .choose(&mut rand::thread_rng())
+        .choose(&mut rand::rng())
         .unwrap()
         .parse::<Ipv4Addr>()
         .unwrap();
@@ -166,10 +166,10 @@ async fn main() -> io::Result<()> {
                     if let Err(err) = socket.send_to(&result, src).await {
                         println!("failed to send result to {src}: {err}");
                     }
-                },
+                }
                 Err(err) => {
                     println!("error during handling request: {err}");
-                },
+                }
             }
         });
     }

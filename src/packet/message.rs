@@ -1,7 +1,7 @@
 use std::net::Ipv4Addr;
 
 use cookie_factory as cf;
-use nom::{multi::count, sequence::tuple};
+use nom::{Parser, multi::count};
 use rand::seq::IteratorRandom;
 use thiserror::Error;
 
@@ -49,7 +49,7 @@ impl DnsMessage {
 
     pub fn parse<'a>(i: Input<'a>, buf: &'a ByteBuffer) -> ParseResult<'a, Self> {
         let (i, header) = DnsHeader::parse(i)?;
-        let (i, (questions, answers, authorities, resources)) = tuple((
+        let (i, (questions, answers, authorities, resources)) = (
             count(|x| DnsQuestion::parse(x, buf), header.questions as usize),
             count(|x| DnsRecord::parse(x, buf), header.answers as usize),
             count(
@@ -60,7 +60,8 @@ impl DnsMessage {
                 |x| DnsRecord::parse(x, buf),
                 header.resource_entries as usize,
             ),
-        ))(i)?;
+        )
+            .parse(i)?;
 
         Ok((
             i,
@@ -91,7 +92,7 @@ impl DnsMessage {
             .answers
             .iter()
             .filter(|record| matches!(record, DnsRecord::A { .. }))
-            .choose(&mut rand::thread_rng())
+            .choose(&mut rand::rng())
         {
             Some(*addr)
         } else {
@@ -121,13 +122,13 @@ impl DnsMessage {
                     })
             })
             .copied()
-            .choose(&mut rand::thread_rng())
+            .choose(&mut rand::rng())
     }
 
     pub fn get_unresolved_ns<'a>(&'a self, qname: &'a Qname) -> Option<&'a Qname> {
         self.get_ns(qname)
             .map(|(_, host)| host)
-            .choose(&mut rand::thread_rng())
+            .choose(&mut rand::rng())
     }
 }
 

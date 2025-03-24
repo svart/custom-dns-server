@@ -2,6 +2,7 @@ use std::io;
 
 use bitvec::{prelude::Msb0, vec::BitVec, view::BitView};
 use cookie_factory as cf;
+use nom::Parser;
 use nom::bits::complete::take;
 use nom::combinator::map;
 use nom::error::ErrorKind as NomErrorKind;
@@ -58,13 +59,13 @@ where
 
 impl BitParsable for u4 {
     fn parse(i: BitInput) -> BitResult<Self> {
-        map(take(4_usize), Self::new)(i)
+        map(take(4_usize), Self::new).parse(i)
     }
 }
 
 impl BitParsable for bool {
     fn parse(i: BitInput) -> BitResult<Self> {
-        map(take(1_usize), |x: u8| x != 0)(i)
+        map(take(1_usize), |x: u8| x != 0).parse(i)
     }
 }
 
